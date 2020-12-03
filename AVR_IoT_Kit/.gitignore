@@ -1,3 +1,11 @@
+#Extra MPLAB
+
+*.flag
+*.xml
+*.mk
+*.properties
+
+
 # Prerequisites
 *.d
 
