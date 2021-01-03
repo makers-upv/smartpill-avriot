@@ -65,7 +65,9 @@
                         "wifi <ssid>[,<pass>,[authType]]" NEWLINE\
                         "debug" NEWLINE\
                         "--------------------------------------------"NEWLINE"\4"
-
+#define UNKNOWN_CMD_MSG_PILL "Unknown comand. List of available" NEWLINE\           Custom mensage for error feedback
+                             "pill [first arg] [second arg]" NEWLINE\
+                              
 static char command[MAX_COMMAND_SIZE];
 static bool isCommandReceived = false;
 static uint8_t index = 0;
@@ -76,6 +78,7 @@ const char * const cli_option_version_number      = "1.0.1";
 const char * const firmware_version_number        = "4.1.0";
 
 static void command_received(char *command_text);
+
 static void reset_cmd(char *pArg);
 static void reconnect_cmd(char *pArg);
 static void set_wifi_auth(char *ssid_pwd_auth);
@@ -84,6 +87,9 @@ static void get_device_id(char *pArg);
 static void get_cli_version(char *pArg);
 static void get_firmware_version(char *pArg);
 static void set_debug_level(char *pArg);
+static void pill_test(char *pArg);
+
+
 static bool endOfLineTest(char c);
 static void enableUsartRxInterrupts(void);
 
@@ -106,7 +112,8 @@ const struct cmd commands[] =
     { "device",      get_device_id },
     { "cli_version", get_cli_version },
     { "version",     get_firmware_version },
-    { "debug",       set_debug_level }
+    { "debug",       set_debug_level },
+    { "pill",        pill_test}
 };
 
 void CLI_init(void)
@@ -259,6 +266,30 @@ static void set_wifi_auth(char *ssid_pwd_auth)
 	}
 }
 
+//Parser pill 2 arg
+static void pill_test(char *pArg)
+{
+    uint8_t pArg_NUM = 0;
+    uint16_t sArg_NUM = 0;
+    char *spArg = strstr(pArg, " ");    //Find 2nd argument
+    *spArg ='\0';                       //create a str for 1st arg
+    spArg++;                            //2nd arg 1st position
+    if(*pArg >= '0' && *pArg<= '9')     //check that the values is in hte corrent range
+    {
+        pArg_NUM = atoi(pArg);          // str to int
+    }else{
+        printf("E_1N");
+    }
+    if(*spArg >= '0' && *spArg<= '9')
+    {
+        sArg_NUM = atoi(spArg);         // str to int
+    }else{
+        printf("E_2N");
+    }  
+    printf("pill first:%d |%s| second: %d |%s|",pArg_NUM,pArg,sArg_NUM,spArg );
+}
+
+
 static void reconnect_cmd(char *pArg)
 {
     (void)pArg;
@@ -344,6 +375,7 @@ static void get_firmware_version(char *pArg)
     printf("v%s\r\n\4", firmware_version_number);
 }
 
+//Comand Parser
 static void command_received(char *command_text)
 {
     uint8_t cmp;
@@ -351,8 +383,7 @@ static void command_received(char *command_text)
     uint8_t cc_len;
     uint8_t cmdIndex = 0;
 
-    char *argument = strstr(command_text, " ");
-
+    char *argument = strstr(command_text, " "); // Search for arguments space ? any argument
     if (argument != NULL)
     {
         /* Replace the delimiter with string terminator */
@@ -377,7 +408,7 @@ static void command_received(char *command_text)
         }
     }
 
-    printf(UNKNOWN_CMD_MSG);
+    printf(UNKNOWN_CMD_MSG_PILL);
 }
 
 static void enableUsartRxInterrupts(void)
