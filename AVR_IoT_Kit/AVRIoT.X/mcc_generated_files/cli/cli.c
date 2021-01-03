@@ -67,6 +67,7 @@
                         "--------------------------------------------" NEWLINE
 #define UNKNOWN_CMD_MSG_PILL "Unknown comand. List of available:"NEWLINE\
                              "pill f_arg s_arg"NEWLINE                            
+
 static char command[MAX_COMMAND_SIZE];
 static bool isCommandReceived = false;
 static uint8_t index = 0;
