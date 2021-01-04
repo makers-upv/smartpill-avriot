@@ -67,6 +67,7 @@ static uint8_t toggleState = 0;
 // This will contain the device ID, before we have it this dummy value is the init value which is non-0
 char attDeviceID[20] = "BAAAAADD1DBAAADD1D";
 char mqttSubscribeTopic[SUBSCRIBE_TOPIC_SIZE];
+char dispenseSubscribeTopic[SUBSCRIBE_TOPIC_SIZE]; //custom var for dispense topic
 ATCA_STATUS retValCryptoClientSerialNumber;
 static uint8_t holdCount = 0;
 
@@ -151,6 +152,18 @@ static void receivedFromCloud(uint8_t *topic, uint8_t *payload)
     debug_printIoTAppMsg("topic: %s", topic);
     debug_printIoTAppMsg("payload: %s", payload);
     updateDeviceShadow();
+}
+//Example funtion for custom subscribed topìc callback
+static void receiveddispenseFromCloud(uint8_t *topic, uint8_t *payload)
+{
+    int len = 0;
+    static char json[PAYLOAD_SIZE];
+    static int i = 0;
+    LED_test();
+    len = sprintf(json,"{\"Light\":12,\"Temp\":34}");
+    if(strcmp(json,payload)){
+        CLOUD_publishData((uint8_t*)topic ,(uint8_t*)json, len);       
+    }   
 }
 
 void application_init(void)
@@ -291,6 +304,8 @@ static void subscribeToCloud(void)
 {
     sprintf(mqttSubscribeTopic, "$aws/things/%s/shadow/update/delta", cid); 
     CLOUD_registerSubscription((uint8_t*)mqttSubscribeTopic,receivedFromCloud);
+    sprintf(dispenseSubscribeTopic, "dispensepill");                                        //Custom topic
+    CLOUD_registerSubscription((uint8_t*)dispenseSubscribeTopic,receiveddispenseFromCloud); //Callback linkage
 }
 
 static void setToggleState(uint8_t passedToggleState)
