@@ -23,7 +23,7 @@ THE FULLEST EXTENT ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL
 CLAIMS IN ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT
 OF FEES, IF ANY, THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS
 SOFTWARE.
-*/
+ */
 
 #include <string.h>
 #include <time.h>
@@ -47,6 +47,7 @@ SOFTWARE.
 #include "led.h"
 #include "debug_print.h"
 #include "time_service.h"
+#include "../../IoTPill.h"
 #if CFG_ENABLE_CLI
 #include "cli/cli.h"
 #endif
@@ -67,7 +68,7 @@ static uint8_t toggleState = 0;
 // This will contain the device ID, before we have it this dummy value is the init value which is non-0
 char attDeviceID[20] = "BAAAAADD1DBAAADD1D";
 char mqttSubscribeTopic[SUBSCRIBE_TOPIC_SIZE];
-char dispenseSubscribeTopic[SUBSCRIBE_TOPIC_SIZE]; //custom var for dispense topic
+
 ATCA_STATUS retValCryptoClientSerialNumber;
 static uint8_t holdCount = 0;
 
@@ -89,58 +90,59 @@ void loadCustomAWSEndpoint(void);
 void loadDefaultAWSEndpoint(void);
 #endif
 
+//Variables for IoT Pill dispenser
+datapills pills ; //Values of all the data of the pills
+char dispenseSubscribeTopic[SUBSCRIBE_TOPIC_SIZE]; //Custom var for dispense topic
+
+
 // This will get called every 1 second only while we have a valid Cloud connection
-static void sendToCloud(void)
-{
-    static char json[PAYLOAD_SIZE];
-    static char publishMqttTopic[PUBLISH_TOPIC_SIZE];
-    int rawTemperature = 0;
-    int light = 0;
-    int len = 0;    
-    memset((void*)publishMqttTopic, 0, sizeof(publishMqttTopic));
-    sprintf(publishMqttTopic, "%s/sensors", cid);
-    // This part runs every CFG_SEND_INTERVAL seconds
-    if (shared_networking_params.haveAPConnection)
-    {
-        rawTemperature = SENSORS_getTempValue();
-        light = SENSORS_getLightValue();
-        len = sprintf(json,"{\"Light\":%d,\"Temp\":%d.%02d}", light,rawTemperature/100,abs(rawTemperature)%100);
-    }
-    if (len >0) 
-    {
-        CLOUD_publishData((uint8_t*)publishMqttTopic ,(uint8_t*)json, len);        
-        if (holdCount)
-        {
-            holdCount--;
-        }
-        else
-        {
-            ledParameterYellow.onTime = LED_BLIP;
-            ledParameterYellow.offTime = LED_BLIP;
-            LED_control(&ledParameterYellow);
-        }
-    }
+// For the IoT Pill dispenser we will empty this funtion, but left for reference 
+static void sendToCloud(void) {
+
+    /* static char json[PAYLOAD_SIZE];
+     static char publishMqttTopic[PUBLISH_TOPIC_SIZE];
+     int rawTemperature = 0;
+     int light = 0;
+     int len = 0;    
+     memset((void*)publishMqttTopic, 0, sizeof(publishMqttTopic));
+     sprintf(publishMqttTopic, "%s/sensors", cid);
+     // This part runs every CFG_SEND_INTERVAL seconds
+     if (shared_networking_params.haveAPConnection)
+     {
+         rawTemperature = SENSORS_getTempValue();
+         light = SENSORS_getLightValue();
+         len = sprintf(json,"{\"Light\":%d,\"Temp\":%d.%02d}", light,rawTemperature/100,abs(rawTemperature)%100);
+     }
+     if (len >0) 
+     {
+         CLOUD_publishData((uint8_t*)publishMqttTopic ,(uint8_t*)json, len);        
+         if (holdCount)
+         {
+             holdCount--;
+         }
+         else
+         {
+             ledParameterYellow.onTime = LED_BLIP;
+             ledParameterYellow.offTime = LED_BLIP;
+             LED_control(&ledParameterYellow);
+         }
+     }*/
 }
 
 //This handles messages published from the MQTT server when subscribed
-static void receivedFromCloud(uint8_t *topic, uint8_t *payload)
-{
+
+static void receivedFromCloud(uint8_t *topic, uint8_t *payload) {
     char *toggleToken = "\"toggle\":";
     char *subString;
-   sprintf(mqttSubscribeTopic, "$aws/things/%s/shadow/update/delta", cid);
-    if (strncmp((void*) mqttSubscribeTopic, (void*) topic, strlen(mqttSubscribeTopic)) == 0) 
-    {
-        if ((subString = strstr((char*)payload, toggleToken)))
-        {
-            if (subString[strlen(toggleToken)] == '1')
-            {   
+    sprintf(mqttSubscribeTopic, "$aws/things/%s/shadow/update/delta", cid);
+    if (strncmp((void*) mqttSubscribeTopic, (void*) topic, strlen(mqttSubscribeTopic)) == 0) {
+        if ((subString = strstr((char*) payload, toggleToken))) {
+            if (subString[strlen(toggleToken)] == '1') {
                 setToggleState(TOGGLE_ON);
                 ledParameterYellow.onTime = SOLID_ON;
                 ledParameterYellow.offTime = SOLID_OFF;
                 LED_control(&ledParameterYellow);
-            }
-            else
-            {
+            } else {
                 setToggleState(TOGGLE_OFF);
                 ledParameterYellow.onTime = SOLID_OFF;
                 ledParameterYellow.offTime = SOLID_ON;
@@ -154,24 +156,73 @@ static void receivedFromCloud(uint8_t *topic, uint8_t *payload)
     updateDeviceShadow();
 }
 //Example funtion for custom subscribed topìc callback
-static void receiveddispenseFromCloud(uint8_t *topic, uint8_t *payload)
-{
-    int len = 0;
-    static char json[PAYLOAD_SIZE];
-    static int i = 0;
-    LED_test();
-    len = sprintf(json,"{\"Light\":12,\"Temp\":34}");
-    if(strcmp(json,payload)){
-        CLOUD_publishData((uint8_t*)topic ,(uint8_t*)json, len);       
-    }   
+static void receiveddispenseFromCloud(uint8_t *topic, uint8_t *payload) {
+
+    uint8_t *input = payload;
+    
+    //Each of the JSON parameters that we want to analize
+    char *tokennpills = "\"npills\": ";
+    char *tokentime = "\"time\": \"";
+    char *tokenpill = "\"pill\": \"";
+    char *tokenqty = "\"qty\": ";
+    char *tokendeposit = "\"deposit\": ";
+    char *tokenweight = "\"weight\": ";
+    
+    char *search_start;
+    char *search_end;
+    
+   
+    //JSON parser for the first part of the msg with the time and the nº of pills    
+    search_start = (char *) (strstr((char*) input, tokennpills) + strlen(tokennpills)); //npills
+    search_end = strchr((char*) search_start, ',');
+    *search_end = '\0';
+    pills.numpill = atoi(search_start); //Number of pill data included in the JSON
+    input = (uint8_t*) (search_end + 1);
+
+    search_start = (char *) (strstr((char*) input, tokentime) + strlen(tokentime)); //time
+    search_end = strchr((char*) search_start, '\"');
+    *search_end = '\0';
+    strcpy(pills.time, search_start);
+    input = (uint8_t*) (search_end + 1);
+
+
+    //JSON parser for the second part of the msg with the pills information
+    for (uint8_t i = 0; i <pills.numpill; i++) {
+
+        search_start = (char *) (strstr((char*) input, tokenpill) + strlen(tokenpill)); //Pillname
+        search_end = strchr((char*) search_start, '\"');
+        *search_end = '\0';
+        strcpy(pills.pill[i].pillname, search_start);
+        input = (uint8_t*) (search_end + 1);
+
+        search_start = (char *) (strstr((char*) input, tokenqty) + strlen(tokenqty)); //quantity
+        search_end = strchr(search_start, ',');
+        *search_end = '\0';
+        strcpy(pills.pill[i].quantity, search_start);
+        input = (uint8_t*) (search_end + 1);
+
+        search_start = (char *) (strstr((char*) input, tokendeposit) + strlen(tokendeposit)); //deposit
+        search_end = strchr(search_start, ',');
+        *search_end = '\0';
+        strcpy(pills.pill[i].deposit, search_start);
+        input = (uint8_t*) (search_end + 1);
+
+        search_start = (char *) (strstr((char*) input, tokenweight) + strlen(tokenweight)); //weight
+        search_end = strchr(search_start, '}');
+        *search_end = '\0';
+        strcpy(pills.pill[i].weight, search_start);
+        input = (uint8_t*) (search_end + 1);
+        
+         printf("D %s %s %s %s ", pills.pill[i].pillname, pills.pill[i].quantity, pills.pill[i].deposit, pills.pill[i].weight); // Send each parameter by USART
+    }
+    printf("\n");
 }
 
-void application_init(void)
-{
-	uint8_t mode = WIFI_DEFAULT;
-	uint32_t sw0CurrentVal = 0;
-	uint32_t sw1CurrentVal = 0;
-	uint32_t i = 0;
+void application_init(void) {
+    uint8_t mode = WIFI_DEFAULT;
+    uint32_t sw0CurrentVal = 0;
+    uint32_t sw1CurrentVal = 0;
+    uint32_t i = 0;
 
     // Initialization of modules before interrupts are enabled
     SYSTEM_Initialize();
@@ -180,21 +231,18 @@ void application_init(void)
     CLI_init();
     CLI_setdeviceId(attDeviceID);
 #endif   
-    debug_init(attDeviceID);   
-    
+    debug_init(attDeviceID);
+
     // Initialization of modules where the init needs interrupts to be enabled
-    if(!CryptoAuth_Initialize())
-    {
+    if (!CryptoAuth_Initialize()) {
         debug_printError("APP: CryptoAuthInit failed");
         shared_networking_params.haveError = 1;
     }
     // Get serial number from the ECC608 chip 
     retValCryptoClientSerialNumber = CRYPTO_CLIENT_printSerialNumber(attDeviceID);
-    if( retValCryptoClientSerialNumber != ATCA_SUCCESS )
-    {
+    if (retValCryptoClientSerialNumber != ATCA_SUCCESS) {
         shared_networking_params.haveError = 1;
-        switch(retValCryptoClientSerialNumber)
-        {
+        switch (retValCryptoClientSerialNumber) {
             case ATCA_GEN_FAIL:
                 debug_printError("APP: DeviceID generation failed, unspecified error");
                 break;
@@ -204,34 +252,31 @@ void application_init(void)
                 debug_printError("APP: DeviceID generation failed");
                 break;
         }
-        
+
     }
 #if CFG_ENABLE_CLI   
     CLI_setdeviceId(attDeviceID);
 #endif   
-    debug_setPrefix(attDeviceID);     
+    debug_setPrefix(attDeviceID);
 #if USE_CUSTOM_ENDPOINT_URL
     loadCustomAWSEndpoint();
 #else
     loadDefaultAWSEndpoint();
 #endif  
     wifi_readThingNameFromWinc();
-    timeout_create(&initDeviceShadowTimer, DEVICE_SHADOW_INIT_INTERVAL );    
+    timeout_create(&initDeviceShadowTimer, DEVICE_SHADOW_INIT_INTERVAL);
     // Blocking debounce
-    for(i = 0; i < SW_DEBOUNCE_INTERVAL; i++)
-    {
+    for (i = 0; i < SW_DEBOUNCE_INTERVAL; i++) {
         sw0CurrentVal += SW0_TOGGLE_STATE;
         sw1CurrentVal += SW1_TOGGLE_STATE;
     }
-    if(sw0CurrentVal < (SW_DEBOUNCE_INTERVAL/2))
-    {
-        if(sw1CurrentVal < (SW_DEBOUNCE_INTERVAL/2))
-        {    
+    if (sw0CurrentVal < (SW_DEBOUNCE_INTERVAL / 2)) {
+        if (sw1CurrentVal < (SW_DEBOUNCE_INTERVAL / 2)) {
             // Default Credentials + Connect to AP
             strcpy(ssid, CFG_MAIN_WLAN_SSID);
             strcpy(pass, CFG_MAIN_WLAN_PSK);
-            sprintf((char*)authType, "%d", CFG_MAIN_WLAN_AUTH);
-            
+            sprintf((char*) authType, "%d", CFG_MAIN_WLAN_AUTH);
+
             ledParameterBlue.onTime = LED_BLINK;
             ledParameterBlue.offTime = LED_BLINK;
             LED_control(&ledParameterBlue);
@@ -247,9 +292,7 @@ void application_init(void)
             shared_networking_params.amConnectingAP = 1;
             shared_networking_params.amSoftAP = 0;
             shared_networking_params.amDefaultCred = 1;
-        }
-        else
-        {    
+        } else {
             // Host as SOFT AP
             ledParameterBlue.onTime = LED_BLIP;
             ledParameterBlue.offTime = LED_BLIP;
@@ -268,11 +311,9 @@ void application_init(void)
             shared_networking_params.amSoftAP = 1;
             shared_networking_params.amDefaultCred = 0;
         }
-    }
-    else
-    {    
+    } else {
         // Connect to AP
-         ledParameterBlue.onTime = LED_BLINK;
+        ledParameterBlue.onTime = LED_BLINK;
         ledParameterBlue.offTime = LED_BLINK;
         LED_control(&ledParameterBlue);
         ledParameterGreen.onTime = SOLID_OFF;
@@ -289,87 +330,76 @@ void application_init(void)
         shared_networking_params.amDefaultCred = 0;
     }
     wifi_init(wifiConnectionStateChanged, mode);
-    
-    if (mode == WIFI_DEFAULT) 
-    {
+
+    if (mode == WIFI_DEFAULT) {
         CLOUD_setupTask(attDeviceID);
         timeout_create(&MAIN_dataTasksTimer, MAIN_DATATASK_INTERVAL);
     }
-    
+
     LED_test();
     subscribeToCloud();
 }
 
-static void subscribeToCloud(void)
-{
-    sprintf(mqttSubscribeTopic, "$aws/things/%s/shadow/update/delta", cid); 
-    CLOUD_registerSubscription((uint8_t*)mqttSubscribeTopic,receivedFromCloud);
-    sprintf(dispenseSubscribeTopic, "dispensepill");                                        //Custom topic
-    CLOUD_registerSubscription((uint8_t*)dispenseSubscribeTopic,receiveddispenseFromCloud); //Callback linkage
+//Modified subscribe to cloud 
+static void subscribeToCloud(void) {
+    sprintf(mqttSubscribeTopic, "$aws/things/%s/shadow/update/delta", cid);
+    CLOUD_registerSubscription((uint8_t*) mqttSubscribeTopic, receivedFromCloud);
+    //Custom service
+    sprintf(dispenseSubscribeTopic, "dispensepill"); //Custom topic
+    CLOUD_registerSubscription((uint8_t*) dispenseSubscribeTopic, receiveddispenseFromCloud); //Callback linkage
 }
 
-static void setToggleState(uint8_t passedToggleState)
-{
+static void setToggleState(uint8_t passedToggleState) {
     toggleState = passedToggleState;
 }
 
-static uint8_t getToggleState(void)
-{
+static uint8_t getToggleState(void) {
     return toggleState;
 }
 
-uint32_t initDeviceShadow(void *payload)
-{
+uint32_t initDeviceShadow(void *payload) {
     static uint32_t previousTime = 0;
-    if(CLOUD_checkIsConnected())
-    {    
-       // Get the current time. This uses the C standard library time functions
-       uint32_t timeNow = TIME_getCurrent();
-       if(previousTime == 0)
-       {
-           previousTime = timeNow;         
-       }
-       else if((TIME_getDiffTime(timeNow, previousTime)) >= UPDATE_DEVICE_SHADOW_BUFFER_TIME)
-       {
-           updateDeviceShadow();
-           return 0; 
-       }
+    if (CLOUD_checkIsConnected()) {
+        // Get the current time. This uses the C standard library time functions
+        uint32_t timeNow = TIME_getCurrent();
+        if (previousTime == 0) {
+            previousTime = timeNow;
+        } else if ((TIME_getDiffTime(timeNow, previousTime)) >= UPDATE_DEVICE_SHADOW_BUFFER_TIME) {
+            updateDeviceShadow();
+            return 0;
+        }
     }
     return DEVICE_SHADOW_INIT_INTERVAL;
 }
 
-static void updateDeviceShadow(void)
-{
+static void updateDeviceShadow(void) {
     static char payload[PAYLOAD_SIZE];
     static char topic[PUBLISH_TOPIC_SIZE];
     int payloadLength = 0;
-     
-    memset((void*)topic, 0, sizeof(topic));
+
+    memset((void*) topic, 0, sizeof (topic));
     sprintf(topic, "$aws/things/%s/shadow/update", cid);
-    if (shared_networking_params.haveAPConnection)
-    { 
-        payloadLength = sprintf(payload,"{\"state\":{\"reported\":{\"toggle\":%d}}}", getToggleState());
+    if (shared_networking_params.haveAPConnection) {
+        payloadLength = sprintf(payload, "{\"state\":{\"reported\":{\"toggle\":%d}}}", getToggleState());
     }
-    if (payloadLength >0) 
-    {
-        CLOUD_publishData((uint8_t*)topic,(uint8_t*)payload, payloadLength); 
+    if (payloadLength > 0) {
+        CLOUD_publishData((uint8_t*) topic, (uint8_t*) payload, payloadLength);
     }
 }
 
 #if USE_CUSTOM_ENDPOINT_URL
-void loadCustomAWSEndpoint(void)
-{
+
+void loadCustomAWSEndpoint(void) {
     memset(awsEndpoint, '\0', AWS_ENDPOINT_LEN);
     sprintf(awsEndpoint, "%s", CFG_MQTT_HOSTURL);
     debug_printIoTAppMsg("Custom AWS Endpoint is used : %s", awsEndpoint);
 }
 #else
-void loadDefaultAWSEndpoint(void)
-{
+
+void loadDefaultAWSEndpoint(void) {
     memset(awsEndpoint, '\0', AWS_ENDPOINT_LEN);
     wifi_readAWSEndpointFromWinc();
-    if(awsEndpoint[0] == 0xFF)
-    {
+    if (awsEndpoint[0] == 0xFF) {
         sprintf(awsEndpoint, "%s", AWS_MCHP_SANDBOX_URL);
         debug_printIoTAppMsg("Using the AWS Sandbox endpoint : %s", awsEndpoint);
     }
@@ -377,98 +407,83 @@ void loadDefaultAWSEndpoint(void)
 #endif
 
 // This scheduler will check all tasks and timers that are due and service them
-void runScheduler(void)
-{
+
+void runScheduler(void) {
     timeout_callNextCallback();
 }
 
 // This gets called by the scheduler approximately every 100ms
-uint32_t MAIN_dataTask(void *payload)
-{
+
+uint32_t MAIN_dataTask(void *payload) {
     static uint32_t previousTransmissionTime = 0;
-    
+
     // Get the current time. This uses the C standard library time functions
     uint32_t timeNow = TIME_getCurrent();
-    
+
     // Example of how to send data when MQTT is connected every 1 second based on the system clock
-    if(CLOUD_checkIsConnected())
-    {
+    if (CLOUD_checkIsConnected()) {
         // How many seconds since the last time this loop ran?
         int32_t delta = TIME_getDiffTime(timeNow, previousTransmissionTime);
-        
-        if (delta >= CFG_SEND_INTERVAL)
-        {
+
+        if (delta >= CFG_SEND_INTERVAL) {
             previousTransmissionTime = timeNow;
             // Call the data task in main.c
-            sendToCloud();
+            sendToCloud(); 
         }
-    } 
-    else
-    {
+    } else {
         ledParameterYellow.onTime = SOLID_OFF;
         ledParameterYellow.offTime = SOLID_ON;
-        LED_control(&ledParameterYellow);         
+        LED_control(&ledParameterYellow);
     }
-    
+
     // Blue LED
-    if (!shared_networking_params.amConnectingAP)
-    {
-        if (shared_networking_params.haveAPConnection)
-        {
+    if (!shared_networking_params.amConnectingAP) {
+        if (shared_networking_params.haveAPConnection) {
             ledParameterBlue.onTime = SOLID_ON;
             ledParameterBlue.offTime = SOLID_OFF;
-            LED_control(&ledParameterBlue);  
+            LED_control(&ledParameterBlue);
         }
-        
+
         // Green LED if we are in Access Point
-        if (!shared_networking_params.amConnectingSocket)
-        {
-            if(CLOUD_checkIsConnected())
-            {
+        if (!shared_networking_params.amConnectingSocket) {
+            if (CLOUD_checkIsConnected()) {
                 ledParameterGreen.onTime = SOLID_ON;
                 ledParameterGreen.offTime = SOLID_OFF;
                 LED_control(&ledParameterGreen);
-            }
-            else if(shared_networking_params.haveDataConnection == 1)
-            {
+            } else if (shared_networking_params.haveDataConnection == 1) {
                 ledParameterGreen.onTime = LED_BLINK;
                 ledParameterGreen.offTime = LED_BLINK;
                 LED_control(&ledParameterGreen);
             }
         }
     }
-    
+
     // RED LED
-    if (shared_networking_params.haveError)
-    {
+    if (shared_networking_params.haveError) {
         ledParameterRed.onTime = SOLID_ON;
         ledParameterRed.offTime = SOLID_OFF;
         LED_control(&ledParameterRed);
-    }
-    else
-    {
+    } else {
         ledParameterRed.onTime = SOLID_OFF;
         ledParameterRed.offTime = SOLID_ON;
         LED_control(&ledParameterRed);
     }
-        
+
     // This is milliseconds managed by the RTC and the scheduler, this return 
     // makes the timer run another time, returning 0 will make it stop
-    return MAIN_DATATASK_INTERVAL; 
+    return MAIN_DATATASK_INTERVAL;
 }
 
-void application_post_provisioning(void)
-{
+void application_post_provisioning(void) {
     CLOUD_setupTask(attDeviceID);
     timeout_create(&MAIN_dataTasksTimer, MAIN_DATATASK_INTERVAL);
 }
 
 // React to the WIFI state change here. Status of 1 means connected, Status of 0 means disconnected
-static void  wifiConnectionStateChanged(uint8_t status)
-{
+
+static void wifiConnectionStateChanged(uint8_t status) {
     // If we have no AP access we want to retry
-    if (status != 1)
-    {
+    if (status != 1) {
         CLOUD_reset();
-    } 
+    }
 }

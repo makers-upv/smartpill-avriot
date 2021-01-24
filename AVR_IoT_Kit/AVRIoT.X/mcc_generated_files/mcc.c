@@ -44,7 +44,7 @@ void SYSTEM_Initialize(void)
     SLPCTRL_Initialize();
     CLKCTRL_Initialize();
     I2C0_Initialize();
-    ADC0_Initialize();
+    //ADC0_Initialize(); // For the IoT Pill dispense we wont need it
     RTC_Initialize();
     SPI0_Initialize();
     USART2_Initialize();

@@ -66,7 +66,8 @@
                         "debug" NEWLINE\
                         "--------------------------------------------" NEWLINE
 #define UNKNOWN_CMD_MSG_PILL "Unknown comand. List of available:"NEWLINE\
-                             "pill f_arg s_arg"NEWLINE                            
+                             "pill f_arg s_arg"NEWLINE\
+                             "ack f_arg"NEWLINE
 
 static char command[MAX_COMMAND_SIZE];
 static bool isCommandReceived = false;
@@ -87,7 +88,7 @@ static void get_device_id(char *pArg);
 static void get_cli_version(char *pArg);
 static void get_firmware_version(char *pArg);
 static void set_debug_level(char *pArg);
-static void pill_test(char *pArg);
+static void pill_command(char *pArg);
 
 
 static bool endOfLineTest(char c);
@@ -96,6 +97,9 @@ static void enableUsartRxInterrupts(void);
 
 uint32_t CLI_task(void*);
 timerStruct_t CLI_task_timer             = {CLI_task};
+
+//Values of all the data of the pills
+extern datapills pills  ;
 
 struct cmd
 {
@@ -113,7 +117,7 @@ const struct cmd commands[] =
     { "cli_version", get_cli_version },
     { "version",     get_firmware_version },
     { "debug",       set_debug_level },
-    { "pill",        pill_test}
+    { "pill",        pill_command} //Custom Pill command
 };
 
 void CLI_init(void)
@@ -266,29 +270,32 @@ static void set_wifi_auth(char *ssid_pwd_auth)
 	}
 }
 
-//Parser pill 2 arg
-static void pill_test(char *pArg)
+//Custom Callback for the pill command
+static void pill_command(char *pArg)
 {
-    uint8_t pArg_NUM = 0;
-    uint16_t sArg_NUM = 0;
-    char *spArg = strstr(pArg, " ");    //Find 2nd argument
-    *spArg ='\0';                       //create a str for 1st arg
-    spArg++;                            //2nd arg 1st position
-    if(*pArg >= '0' && *pArg<= '9')     //check that the values is in hte corrent range
-    {
-        pArg_NUM = atoi(pArg);          // str to int
-    }else{
-        printf("E_1N");
+    char *topicsend = "confirmationpill"; //MQTT topic to send
+    char msg[PAYLOAD_SIZE];
+    int  msg_len = 0;
+    char state[10];
+    uint8_t count = 0 ;
+    
+    //Pill msg parser
+    
+    if(*pArg <= '0' && *pArg >= '9')     //check that the values is in the correct range
+    {  
+        printf('E');
+        return;
+    }else {
+        if(*pArg == 1){
+            strcpy(state,"ok");
+        }else{
+            strcpy(state,"error");
+        }
+        msg_len = sprintf((char*)msg, "{\"time\":\"%s\",\"state\":\"%s\"}", pills.time, state);
+        CLOUD_publishData((uint8_t*) topicsend, (uint8_t*) msg , msg_len);
     }
-    if(*spArg >= '0' && *spArg<= '9')
-    {
-        sArg_NUM = atoi(spArg);         // str to int
-    }else{
-        printf("E_2N");
-    }  
-    printf("pill first:%d |%s| second: %d |%s|",pArg_NUM,pArg,sArg_NUM,spArg );
 }
-
+    
 
 static void reconnect_cmd(char *pArg)
 {
@@ -383,7 +390,7 @@ static void command_received(char *command_text)
     uint8_t cc_len;
     uint8_t cmdIndex = 0;
 
-    char *argument = strstr(command_text, " "); // Search for arguments space ? any argument
+    char *argument = strchr(command_text, ' '); // Search for arguments space ? any argument
     if (argument != NULL)
     {
         /* Replace the delimiter with string terminator */

@@ -23,12 +23,13 @@
     CLAIMS IN ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT
     OF FEES, IF ANY, THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS
     SOFTWARE.
-*/
+ */
 
 #ifndef CLI_H
 #define CLI_H
 
 #include "../drivers/timeout.h"
+#include "../../IoTPill.h"
 
 void CLI_init(void);
 void CLI_setdeviceId(char *);
