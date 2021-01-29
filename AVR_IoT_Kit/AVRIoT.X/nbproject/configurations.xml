@@ -97,6 +97,7 @@
           <itemPath>mcc_generated_files/include/twi0_master.h</itemPath>
           <itemPath>mcc_generated_files/include/usart2.h</itemPath>
           <itemPath>mcc_generated_files/include/adc0.h</itemPath>
+          <itemPath>mcc_generated_files/include/usart1.h</itemPath>
         </logicalFolder>
         <logicalFolder name="mqtt" displayName="mqtt" projectFiles="true">
           <logicalFolder name="mqtt_comm_bsd"
@@ -316,6 +317,7 @@
           <itemPath>mcc_generated_files/src/twi0_master.c</itemPath>
           <itemPath>mcc_generated_files/src/adc0.c</itemPath>
           <itemPath>mcc_generated_files/src/usart2.c</itemPath>
+          <itemPath>mcc_generated_files/src/usart1.c</itemPath>
         </logicalFolder>
         <logicalFolder name="winc" displayName="winc" projectFiles="true">
           <logicalFolder name="driver" displayName="driver" projectFiles="true">

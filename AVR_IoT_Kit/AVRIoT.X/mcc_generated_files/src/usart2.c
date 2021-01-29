@@ -33,24 +33,6 @@
 
 #include "../include/usart2.h"
 
-#if defined(__GNUC__)
-
-int USART2_printCHAR(char character, FILE *stream)
-{
-    USART2_Write(character);
-    return 0;
-}
-
-FILE USART2_stream = FDEV_SETUP_STREAM(USART2_printCHAR, NULL, _FDEV_SETUP_WRITE);
-
-#elif defined(__ICCAVR__)
-
-int putchar(int outChar)
-{
-    USART2_Write(outChar);
-    return outChar;
-}
-#endif
 
 /* Static Variables holding the ringbuffer used in IRQ mode */
 static uint8_t          USART2_rxbuf[USART2_RX_BUFFER_SIZE];
@@ -255,10 +237,6 @@ void USART2_Initialize()
     USART2_tx_tail     = x;
     USART2_tx_head     = x;
     USART2_tx_elements = x;
-
-#if defined(__GNUC__)
-    stdout = &USART2_stream;
-#endif
 
 }
 

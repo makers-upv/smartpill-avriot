@@ -127,6 +127,7 @@ static void sendToCloud(void) {
              LED_control(&ledParameterYellow);
          }
      }*/
+
 }
 
 //This handles messages published from the MQTT server when subscribed
@@ -216,6 +217,10 @@ static void receiveddispenseFromCloud(uint8_t *topic, uint8_t *payload) {
          printf("D %s %s %s %s ", pills.pill[i].pillname, pills.pill[i].quantity, pills.pill[i].deposit, pills.pill[i].weight); // Send each parameter by USART
     }
     printf("\n");
+    
+    ledParameterYellow.onTime = SOLID_ON;
+    ledParameterYellow.offTime = SOLID_OFF;
+    LED_control(&ledParameterYellow);
 }
 
 void application_init(void) {

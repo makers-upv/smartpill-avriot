@@ -32,6 +32,7 @@
 
 
 #include "mcc.h"
+#include "include/usart1.h"
 
 /**
  * Initializes MCU, drivers and middleware in the project
@@ -48,6 +49,7 @@ void SYSTEM_Initialize(void)
     RTC_Initialize();
     SPI0_Initialize();
     USART2_Initialize();
+    USART1_Initialize();
     CPUINT_Initialize();
     CryptoAuth_Initialize();
     timeout_initialize();

@@ -66,8 +66,8 @@
                         "debug" NEWLINE\
                         "--------------------------------------------" NEWLINE
 #define UNKNOWN_CMD_MSG_PILL "Unknown comand. List of available:"NEWLINE\
-                             "pill f_arg s_arg"NEWLINE\
-                             "ack f_arg"NEWLINE
+                             "pill f_arg "NEWLINE
+                            
 
 static char command[MAX_COMMAND_SIZE];
 static bool isCommandReceived = false;
@@ -117,7 +117,7 @@ const struct cmd commands[] =
     { "cli_version", get_cli_version },
     { "version",     get_firmware_version },
     { "debug",       set_debug_level },
-    { "pill",        pill_command} //Custom Pill command
+    { "pill",        pill_command}              //Custom Pill command
 };
 
 void CLI_init(void)
@@ -286,13 +286,18 @@ static void pill_command(char *pArg)
         printf('E');
         return;
     }else {
-        if(*pArg == 1){
+        if(*pArg == '1'){
             strcpy(state,"ok");
         }else{
             strcpy(state,"error");
         }
         msg_len = sprintf((char*)msg, "{\"time\":\"%s\",\"state\":\"%s\"}", pills.time, state);
         CLOUD_publishData((uint8_t*) topicsend, (uint8_t*) msg , msg_len);
+        
+        ledParameterYellow.onTime = SOLID_OFF;
+        ledParameterYellow.offTime = SOLID_ON;
+        LED_control(&ledParameterYellow);
+        
     }
 }
     
@@ -422,9 +427,12 @@ static void enableUsartRxInterrupts(void)
 {
      // Empty RX buffer
     do {
+        (void)USART1.RXDATAL;
         (void)USART2.RXDATAL;
     } while ((USART2.STATUS & USART_RXCIF_bm) != 0);
 	
     // Enable RX interrupt
-    USART2.CTRLA |=  1 << USART_RXCIE_bp;      
+    USART2.CTRLA |=  1 << USART_RXCIE_bp;  
+    USART1.CTRLA |=  1 << USART_RXCIE_bp;      
+    
 }
