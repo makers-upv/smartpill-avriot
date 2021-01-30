@@ -4,10 +4,10 @@ Firware for the AVR-IoT WA Development Board based on the original [example](htt
 # Main Features
 
 ### Custom CLI
-The already implemented CLI have been extended including the command "pill" , its corresponding callback *pill_command()* that parses the message and sends the by MQTT the confirmation JSON to the topic "confirmationpill". Also the message in case of unknown message there is implemented a custom error message as well as in the callback in case of incorrect parameter.
+The already implemented CLI have been extended including the command "pill" , its corresponding callback *pill_command()* that parses the message and sends th confirmation JSON by MQTT to the topic "confirmationpill". Also, the message in case of unknown message is customized as well as in the callback in case of incorrect parameter.
 
 ### CLI USART moved
-The original CLI used the USART2, which is connected to the debugger by the PCB but is not accesible. For this version the CLI structure and the funtionality *printf()* are now implemented on the USART1, which is avaliable with the pin conectors *RX* and *TX*. This alows us to use this CLI with any external device, taking into account the following configuration:
+The original CLI used the USART2, which is connected to the debugger by the PCB but is not accessible. For this version, the CLI structure and the funtionality *printf()* are now implemented on the USART1, which is avaliable with the pin conectors *RX* and *TX*. This alows us to use this CLI with any external device, taking into account the following configuration:
 Baud Rate | Data | Parity bit | Stop bit | Flow control | Transmit protocol
 ---------- | ----- | ----- | ----- | ----- | -----
 9600 | 8 bits| None | 1 bit | None | CR+LF (Carriage Return + Line Feed)
