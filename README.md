@@ -13,7 +13,7 @@ Baud Rate | Data | Parity bit | Stop bit | Flow control | Transmit protocol
 9600 | 8 bits| None | 1 bit | None | CR+LF (Carriage Return + Line Feed)
 
 ### Custom MQTT topics subcription with JSON parser
-On the [aplication_manager.c]{https://github.com/makers-upv/smartpill-avriot/blob/develop/AVR_IoT_Kit/AVRIoT.X/mcc_generated_files/application_manager.c} could be found the modified version of *subscribeToCloud()* to subscribe to "dispensepill" custom topic and how it is linked to a custom callback *receiveddispenseFromCloud()* in which the data from the JSON is extracted.
+On the [aplication_manager.c](https://github.com/makers-upv/smartpill-avriot/blob/develop/AVR_IoT_Kit/AVRIoT.X/mcc_generated_files/application_manager.c) could be found the modified version of *subscribeToCloud()* to subscribe to "dispensepill" custom topic and how it is linked to a custom callback *receiveddispenseFromCloud()* in which the data from the JSON is extracted.
 
 ### IoTPill.h
 On this header are defined the main structures used to control the data recieved and sended.
